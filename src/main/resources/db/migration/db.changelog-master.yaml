@@ -1,0 +1,7 @@
+databaseChangeLog:
+  - include:
+      file: db/migration/001-create-many-to-many-schema.yaml
+  - include:
+      file: db/migration/002-insert-roles-and-admin.yaml
+  - include:
+      file: db/migration/003-create-card-table.yaml

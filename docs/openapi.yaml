@@ -1,0 +1,422 @@
+openapi: 3.0.3
+info:
+  title: Bank Cards API
+  version: 1.0.0
+  description: |
+    Backend API for managing bank cards with JWT-based security.
+    Roles: ADMIN and USER.
+servers:
+  - url: /api
+tags:
+  - name: Auth
+  - name: Cards (ADMIN)
+  - name: Cards (USER)
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login and get JWT
+      description: Authenticates user and returns JWT token.
+      security: []  # public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            examples:
+              default:
+                value:
+                  username: admin
+                  password: secret
+      responses:
+        '200':
+          description: JWT issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JwtResponse'
+        '401':
+          description: Invalid credentials
+
+  /cards:
+    get:
+      tags: [Cards (USER)]
+      summary: Get current user's cards
+      description: Returns paginated list of cards owned by the authenticated user.
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - $ref: '#/components/parameters/SortDirParam'
+      responses:
+        '200':
+          description: Page of cards
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardPage'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (requires USER role)
+
+  /cards/all:
+    get:
+      tags: [Cards (ADMIN)]
+      summary: Get all cards
+      description: Returns paginated list of all cards (ADMIN only).
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - $ref: '#/components/parameters/SortDirParam'
+      responses:
+        '200':
+          description: Page of cards
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardPage'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (requires ADMIN role)
+
+  /cards:
+    post:
+      tags: [Cards (ADMIN)]
+      summary: Create card
+      description: Creates a new card (ADMIN only).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCardRequest'
+            examples:
+              default:
+                value:
+                  ownerId: "7c2f9d1e-7aa0-4b9a-8a67-6f2b42a89210"
+                  cardholderName: "Ivan Ivanov"
+                  expirationMonth: 12
+                  expirationYear: 2028
+                  initialBalance: "1000.00"
+      responses:
+        '200':
+          description: Card created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardDto'
+        '400':
+          description: Validation error
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (requires ADMIN role)
+
+  /cards/status:
+    patch:
+      tags: [Cards (ADMIN)]
+      summary: Change card status
+      description: Changes status of a card (ADMIN only).
+      parameters:
+        - in: query
+          name: cardId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: status
+          required: true
+          schema:
+            $ref: '#/components/schemas/CardStatus'
+      responses:
+        '200':
+          description: Updated card
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardDto'
+        '400':
+          description: Invalid status or cardId
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (requires ADMIN role)
+        '404':
+          description: Card not found
+
+  /cards/{cardId}:
+    delete:
+      tags: [Cards (ADMIN)]
+      summary: Delete card
+      description: Deletes a card by id (ADMIN only).
+      parameters:
+        - in: path
+          name: cardId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Deleted
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (requires ADMIN role)
+        '404':
+          description: Card not found
+
+  /cards/{cardId}/block-request:
+    post:
+      tags: [Cards (USER)]
+      summary: Request card block
+      description: User requests to block own card. System sets a pending/blocked flag per business rules.
+      parameters:
+        - in: path
+          name: cardId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Card updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardDto'
+        '400':
+          description: Invalid state transition
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not card owner or lacks USER role)
+        '404':
+          description: Card not found
+
+  /cards/{cardId}/balance:
+    get:
+      tags: [Cards (USER)]
+      summary: Get card balance
+      description: Returns the balance for a user's own card.
+      parameters:
+        - in: path
+          name: cardId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Balance as number (BigDecimal)
+          content:
+            application/json:
+              schema:
+                type: number
+                format: double
+                example: 1000.00
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not card owner or lacks USER role)
+        '404':
+          description: Card not found
+
+  /cards/transfer:
+    post:
+      tags: [Cards (USER)]
+      summary: Transfer between own cards
+      description: Transfers amount between two cards owned by the authenticated user.
+      parameters:
+        - in: query
+          name: fromCardId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: toCardId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: amount
+          required: true
+          schema:
+            type: string
+            example: "100.00"
+      responses:
+        '200':
+          description: Transfer accepted
+        '400':
+          description: Validation error (invalid UUID, amount format, same cards, insufficient funds, etc.)
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (cards not owned by user)
+        '404':
+          description: Card not found
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    PageParam:
+      in: query
+      name: page
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    SizeParam:
+      in: query
+      name: size
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 10
+    SortDirParam:
+      in: query
+      name: sort
+      required: false
+      description: Sort direction. API uses fixed field (e.g., id) with provided direction.
+      schema:
+        type: string
+        enum: [ASC, DESC]
+        default: ASC
+
+  schemas:
+    JwtResponse:
+      type: object
+      properties:
+        token:
+          type: string
+      required: [token]
+
+    LoginRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+      required: [username, password]
+
+    CardStatus:
+      type: string
+      enum: [ACTIVE, BLOCKED, EXPIRED]
+
+    CardDto:
+      type: object
+      description: |
+        Card representation.
+        Card number is masked and tokenized/hashed at rest. Only last 4 digits are visible.
+      properties:
+        id:
+          type: string
+          format: uuid
+        maskedNumber:
+          type: string
+          example: "**** **** **** 1234"
+        ownerId:
+          type: string
+          format: uuid
+        cardholderName:
+          type: string
+          example: "Ivan Ivanov"
+        expirationMonth:
+          type: integer
+          minimum: 1
+          maximum: 12
+        expirationYear:
+          type: integer
+          example: 2028
+        status:
+          $ref: '#/components/schemas/CardStatus'
+        balance:
+          type: number
+          format: double
+          example: 1000.00
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - maskedNumber
+        - ownerId
+        - expirationMonth
+        - expirationYear
+        - status
+        - balance
+
+    CreateCardRequest:
+      type: object
+      properties:
+        ownerId:
+          type: string
+          format: uuid
+        cardholderName:
+          type: string
+          minLength: 1
+          maxLength: 128
+        expirationMonth:
+          type: integer
+          minimum: 1
+          maximum: 12
+        expirationYear:
+          type: integer
+          minimum: 2024
+          maximum: 2100
+        initialBalance:
+          type: string
+          pattern: '^\d+(\.\d{1,2})?$'
+          example: "1000.00"
+      required: [ownerId, cardholderName, expirationMonth, expirationYear]
+
+    CardPage:
+      type: object
+      description: Spring Data Page of CardDto
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/CardDto'
+        pageable:
+          type: object
+          additionalProperties: true
+        totalElements:
+          type: integer
+        totalPages:
+          type: integer
+        last:
+          type: boolean
+        size:
+          type: integer
+        number:
+          type: integer
+        sort:
+          type: object
+          additionalProperties: true
+        numberOfElements:
+          type: integer
+        first:
+          type: boolean
+        empty:
+          type: boolean

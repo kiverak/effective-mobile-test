@@ -1,0 +1,52 @@
+databaseChangeLog:
+  - changeSet:
+      id: 4-insert-initial-roles
+      author: vitaliy
+      changes:
+        - insert:
+            tableName: roles
+            columns:
+              - column:
+                  name: id
+                  value: "c6078c59-b1a3-4b9a-9c7b-113264c7604e"
+              - column:
+                  name: name
+                  value: "ROLE_USER"
+        - insert:
+            tableName: roles
+            columns:
+              - column:
+                  name: id
+                  value: "5c7387a6-ea61-4e78-b118-2e0f1baa3e36"
+              - column:
+                  name: name
+                  value: "ROLE_ADMIN"
+
+  - changeSet:
+      id: 5-insert-admin-user
+      author: your_name
+      changes:
+        - insert:
+            tableName: users
+            columns:
+              - column:
+                  name: id
+                  value: "d4e5f6a7-b8c9-10d1-1e2f-3a4b5c6d7e8f"
+              - column:
+                  name: username
+                  value: "admin"
+              - column:
+                  name: password
+                  value: "$2a$10$8.3v5P/frL91S0geP0gYy.ZXKz2E8/QpM0qdnz2OOA4gwg5KzBF7q"
+              - column:
+                  name: status
+                  value: "ACTIVE"
+        - insert:
+            tableName: user_roles
+            columns:
+              - column:
+                  name: user_id
+                  value: "d4e5f6a7-b8c9-10d1-1e2f-3a4b5c6d7e8f"
+              - column:
+                  name: role_id
+                  value: "5c7387a6-ea61-4e78-b118-2e0f1baa3e36"
